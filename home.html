@@ -1,0 +1,388 @@
+<!-- Node/Vue/Vuex/Vue Router/Slack/Socket.io/Redis pubsub Example -->
+<html>
+
+<head>
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+  <title>Microbrewery</title>
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui" />
+  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+  <script src="https://unpkg.com/vuex@2.0.0"></script>
+  <script src="https://unpkg.com/vue-router@2.0.0/dist/vue-router.js"></script>
+  <style>
+    .router-link-active {
+      font-weight: 900;
+    }
+
+    .valid1 {
+      background-color: #d4edda;
+    }
+
+    .warning1 {
+      background-color: #fff3cd;
+    }
+
+    .error1 {
+      background-color: #f8d7da;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <v-app>
+      <v-content>
+        <toolbar></toolbar>
+        <v-simple-table>
+          <template v-slot:default>
+            <thead>
+              <tr>
+                <th class="text-left">Status</th>
+                <th class="text-left">Message</th>
+                <th class="text-left">Timestamp</th>
+              </tr>
+            </thead>
+            <router-view></router-view>
+          </template>
+        </v-simple-table>
+      </v-content>
+    </v-app>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    var socket = io();
+    // A simple Vuex store with state and mutations
+    const store = new Vuex.Store({
+      state: {
+        count: 0,
+        filterStatus: undefined,
+        statusUpdates: []
+      },
+
+      // mutations to modify state
+      mutations: {
+        addStatusUpdate(state, newStatusUpdate) {
+          let id = state.statusUpdates.length + 1;
+          newStatusUpdate.id = id;
+          state.statusUpdates.push(newStatusUpdate);
+        },
+        initialStatusUpdates(state, initialStatusUpdates) {
+          for (i = 0; i < initialStatusUpdates.length; i++) {
+            let newStatusUpdate = JSON.parse(initialStatusUpdates[i]);
+            let id = state.statusUpdates.length + 1;
+            newStatusUpdate.id = id;
+            state.statusUpdates.push(newStatusUpdate);
+          }
+        }
+      },
+
+      // Getters: are like computed properties in a Vue instance
+      // have getter for each type of message, use filter for 'status' and sort for most recent message
+      getters: {
+        boilingStatusUpdates: state => {
+          return state.statusUpdates
+            .filter(statusUpdate => {
+              return statusUpdate.channel.indexOf("boiling") > -1;
+            })
+            .filter(statusUpdate => {
+              if (
+                state.filterStatus === undefined ||
+                state.filterStatus === "all"
+              ) {
+                return state.statusUpdates;
+              } else {
+                return statusUpdate.status.indexOf(state.filterStatus) > -1;
+              }
+            })
+            .sort(function (a, b) {
+              return new Date(b.timestamp) - new Date(a.timestamp);
+            });
+        },
+        mashingStatusUpdates: state => {
+          return state.statusUpdates
+            .filter(statusUpdate => {
+              return statusUpdate.channel.indexOf("mashing") > -1;
+            })
+            .filter(statusUpdate => {
+              if (
+                state.filterStatus === undefined ||
+                state.filterStatus === "all"
+              ) {
+                return state.statusUpdates;
+              } else {
+                return statusUpdate.status.indexOf(state.filterStatus) > -1;
+              }
+            })
+            .sort(function (a, b) {
+              return new Date(b.timestamp) - new Date(a.timestamp);
+            });
+        },
+        fermentationStatusUpdates: state => {
+          return state.statusUpdates
+            .filter(statusUpdate => {
+              return statusUpdate.channel.indexOf("fermentation") > -1;
+            })
+            .filter(statusUpdate => {
+              if (
+                state.filterStatus === undefined ||
+                state.filterStatus === "all"
+              ) {
+                return state.statusUpdates;
+              } else {
+                return statusUpdate.status.indexOf(state.filterStatus) > -1;
+              }
+            })
+            .sort(function (a, b) {
+              return new Date(b.timestamp) - new Date(a.timestamp);
+            });
+        },
+        allStatusUpdates: state => {
+          if (
+            state.filterStatus === undefined ||
+            state.filterStatus === "all"
+          ) {
+            return state.statusUpdates.sort(function (a, b) {
+              return new Date(b.timestamp) - new Date(a.timestamp);
+            });
+          } else {
+            return state.statusUpdates
+              .filter(statusUpdate => {
+                return statusUpdate.status.indexOf(state.filterStatus) > -1;
+              })
+              .sort(function (a, b) {
+                return new Date(b.timestamp) - new Date(a.timestamp);
+              });
+          }
+        }
+      },
+
+      // Actions: are like methods in a Vue instance
+      actions: {}
+    });
+
+    // component for toolbar
+    // has toggle for status and router-links to other pages
+    Vue.component("toolbar", {
+      template: `
+            <v-toolbar>
+            <v-toolbar-title>Microbrewery Updates</v-toolbar-title>
+            <v-spacer></v-spacer>
+            <v-btn-toggle>
+            <v-btn medium v-on:click="filterList(\'all\')">All</v-btn>
+            <v-btn medium v-on:click="filterList(\'valid\')">Valid</v-btn>
+            <v-btn medium v-on:click="filterList(\'warning\')">Warning</v-btn>
+            <v-btn medium v-on:click="filterList(\'error\')">Error</v-btn>
+        </v-btn-toggle>
+            <v-spacer></v-spacer>
+
+            <v-toolbar-items>
+              <v-btn text><router-link to="/all">All</router-link></v-btn>
+              <v-btn text
+                ><router-link to="/boiling">Boiling</router-link></v-btn
+              >
+              <v-btn text
+                ><router-link to="/mashing">Mashing</router-link></v-btn
+              >
+              <v-btn text
+                ><router-link to="/fermentation"
+                  >Fermentation</router-link
+                ></v-btn
+              >
+            </v-toolbar-items>
+          </v-toolbar>
+          `,
+      methods: {
+        filterList(option) {
+          this.$store.state.filterStatus = option;
+          //console.log(this.$store.state.filterStatus);
+        }
+      }
+    });
+
+    // component to display rows for for 'all' page
+    Vue.component("allData", {
+      template: `                                     <tbody>
+       <tr
+          v-for="(statusUpdateItem, index) in allStatusUpdates" class="data-row" v-bind:class="statusUpdateItem.status+1"
+          :key="statusUpdateItem.id"
+          >
+          <td>{{ statusUpdateItem.status }}</td>
+          <td>{{ statusUpdateItem.message }}</td>
+          <td>{{ statusUpdateItem.timestamp }}</td>
+      </tr>
+      </tbody>
+       `,
+      computed: {
+        allStatusUpdates() {
+          return this.$store.getters.allStatusUpdates;
+        }
+      },
+
+      methods: {
+        addStatusUpdate() {
+          this.$store.commit("addStatusUpdate");
+        },
+        initialStatusUpdates() {
+          this.$store.commit("initialStatusUpdates");
+        }
+      }
+    });
+
+    // component to display rows for for 'boiling' page
+    Vue.component("boilingData", {
+      template: `                                     <tbody>
+       <tr
+          v-for="(statusUpdateItem, index) in boilingStatusUpdates" class="data-row" v-bind:class="statusUpdateItem.status+1"
+          :key="statusUpdateItem.id"
+          >
+          <td>{{ statusUpdateItem.status }}</td>
+          <td>{{ statusUpdateItem.message }}</td>
+          <td>{{ statusUpdateItem.timestamp }}</td>
+      </tr>
+      </tbody>
+       `,
+      computed: {
+        boilingStatusUpdates() {
+          return this.$store.getters.boilingStatusUpdates;
+        }
+      },
+
+      methods: {
+        addStatusUpdate() {
+          this.$store.commit("addStatusUpdate");
+        },
+        initialStatusUpdates() {
+          this.$store.commit("initialStatusUpdates");
+        }
+      }
+    });
+
+    // component to display rows for for 'mashing' page
+    Vue.component("mashingData", {
+      template: `                                     <tbody>
+       <tr
+          v-for="(statusUpdateItem, index) in mashingStatusUpdates" class="data-row" v-bind:class="statusUpdateItem.status+1"
+          :key="statusUpdateItem.id"
+          >
+          <td>{{ statusUpdateItem.status }}</td>
+          <td>{{ statusUpdateItem.message }}</td>
+          <td>{{ statusUpdateItem.timestamp }}</td>
+      </tr>
+      </tbody>
+       `,
+      computed: {
+        mashingStatusUpdates() {
+          return this.$store.getters.mashingStatusUpdates;
+        }
+      },
+
+      methods: {
+        addStatusUpdate() {
+          this.$store.commit("addStatusUpdate");
+        },
+        initialStatusUpdates() {
+          this.$store.commit("initialStatusUpdates");
+        }
+      }
+    });
+
+    // component to display rows for for 'fermentation' page
+    Vue.component("fermentationData", {
+      template: `                                     <tbody>
+       <tr
+          v-for="(statusUpdateItem, index) in fermentationStatusUpdates" class="data-row" v-bind:class="statusUpdateItem.status+1"
+          :key="statusUpdateItem.id"
+          >
+          <td>{{ statusUpdateItem.status }}</td>
+          <td>{{ statusUpdateItem.message }}</td>
+          <td>{{ statusUpdateItem.timestamp }}</td>
+      </tr>
+      </tbody>
+       `,
+      computed: {
+        fermentationStatusUpdates() {
+          return this.$store.getters.fermentationStatusUpdates;
+        }
+      },
+
+      methods: {
+        addStatusUpdate() {
+          this.$store.commit("addStatusUpdate");
+        },
+        initialStatusUpdates() {
+          this.$store.commit("initialStatusUpdates");
+        }
+      }
+    });
+
+    // define routes
+    const routes = [{
+        path: "/",
+        component: "allData"
+      },
+      {
+        path: "/all",
+        component: "allData"
+      },
+      {
+        path: "/mashing",
+        component: "mashingData"
+      },
+      {
+        path: "/boiling",
+        component: "boilingData"
+      },
+      {
+        path: "/fermentation",
+        component: "fermentationData"
+      }
+    ];
+
+    // create router instance
+    const router = new VueRouter({
+      routes
+    });
+
+    var app = new Vue({
+      el: "#app",
+      store,
+      vuetify: new Vuetify(),
+      router,
+      created() {
+        socket.on("initialMessages", function (msg) {
+          store.commit("initialStatusUpdates", msg);
+        });
+
+        socket.on("mashing", function (msg) {
+          //console.log(JSON.parse(msg));
+          let mashingMessage = JSON.parse(msg);
+          mashingMessage.channel = "mashing";
+          store.commit("addStatusUpdate", mashingMessage);
+          //console.log(store.state.statusUpdates);
+        });
+
+        socket.on("boiling", function (msg) {
+          //console.log(JSON.parse(msg));
+          let boilingMessage = JSON.parse(msg);
+          boilingMessage.channel = "boiling";
+          store.commit("addStatusUpdate", boilingMessage);
+          //console.log(store.state.statusUpdates);
+        });
+
+        socket.on("fermentation", function (msg) {
+          //console.log(JSON.parse(msg));
+          let fermentationMessage = JSON.parse(msg);
+          fermentationMessage.channel = "fermentation";
+          store.commit("addStatusUpdate", fermentationMessage);
+          //console.log(store.state.statusUpdates);
+        });
+      }
+    });
+  </script>
+</body>
+
+</html>
