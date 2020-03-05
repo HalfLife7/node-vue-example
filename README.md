@@ -13,6 +13,7 @@
 # Get started
 
 - Start server.js then generator.js to start project.
+- Main page can be reached at http://localhost:3000/
 - Once started, the generator will randomly send messages to one of 3 channels (boiling, mashing or fermentation) with 1 of 3 statuses (valid, warning or error) using redis pub/sub channels.
 
 # Twilio instructions
