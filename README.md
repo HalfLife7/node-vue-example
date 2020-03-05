@@ -1,19 +1,19 @@
 #
 # Technologies used:
 
-- Node
-- Vue
-- Vuex
-- Vue Router
+- Node (backend)
+- Vue (frontend)
+- Vuex (state management)
+- Vue Router (routing)
 - Slack
-- io
+- Socket.io
 - Redis pub/sub
 
 #
 # Get started
 
 - Start server.js then generator.js to start project.
-- Example that receives messages from multiple pub/sub channels.
+- Once started, the generator will randomly send messages to one of 3 channels (boiling, mashing or fermentation) with 1 of 3 statuses (valid, warning or error) using redis pub/sub channels.
 
 # Twilio instructions
 
