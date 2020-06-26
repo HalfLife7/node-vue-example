@@ -15,8 +15,8 @@ var redis = require("redis");
 // connection to the service using our url, password 
 // change this to use your username and password
 client = redis.createClient({
-    url: "redis://redis-11537.c10.us-east-1-4.ec2.cloud.redislabs.com:11537",
-    password: "OQZ1vPzSmgQ9za5lXZG5Q2eYgGX3YsJG"
+    url: config.REDIS_URL,
+    password: config.REDIS_PASSWORD
 });
 
 // what to do if error when connecting to server 

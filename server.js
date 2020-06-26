@@ -17,6 +17,7 @@ var Bot = require('slackbots');
 var redis = require("redis");
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
+var config = require('config.js');
 
 // You must also create a file called server.js which runs an Express web server that makes a webpage accessible at http://localhost:3000/dashboard. 
 app.get('/', function (req, res) {
@@ -26,15 +27,15 @@ app.get('/', function (req, res) {
 // connect to redis database
 // first client to subscribe to keyspace events
 clientSub = redis.createClient({
-    url: "redis://redis-11537.c10.us-east-1-4.ec2.cloud.redislabs.com:11537",
-    password: "OQZ1vPzSmgQ9za5lXZG5Q2eYgGX3YsJG"
+    url: config.REDIS_URL,
+    password: config.REDIS_PASSWORD
 });
 
 // second client used to get the key that was published
 // error occurs if client used for subscribing is also used to get the key
 clientPub = redis.createClient({
-    url: "redis://redis-11537.c10.us-east-1-4.ec2.cloud.redislabs.com:11537",
-    password: "OQZ1vPzSmgQ9za5lXZG5Q2eYgGX3YsJG"
+    url: config.REDIS_URL,
+    password: config.REDIS_PASSWORD
 });
 
 
@@ -50,7 +51,7 @@ clientSub.on("error", function (err) {
 
 // create a bot
 var settings = {
-    token: 'xoxb-778504367382-778224973607-1Vv2SGpSxen4BzT1KKyXx5UU',
+    token: config.YELP_TOKEN,
     name: 'yelphelp'
 };
 var bot = new Bot(settings);
